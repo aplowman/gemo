@@ -7,6 +7,7 @@ from spatial_sites.utils import repr_dict
 
 from gemo.geometries import Box
 from gemo.backends import make_figure_func
+from gemo.utils import nest
 
 
 class ViewOrientation(object):
@@ -162,13 +163,57 @@ class GeometryGroup(object):
 
         return group_by_dict
 
+    def _get_plot_data(self, group_points_by):
+
+        points = []
+        for points_name, points_set in self.points.items():
+
+            if points_name in group_points_by:
+                # Split points into groups:
+
+                uniq = [points_set.labels[i].unique_values
+                        for i in group_points_by[points_name]]
+
+                group_name = '{}['.format(points_name)
+                for i in group_points_by[points_name]:
+                    group_name += '{}: {{}}; '.format(i)
+                group_name += ']'
+
+                for i in nest(*uniq):
+                    labels_match = dict(zip(group_points_by[points_name], i))
+                    # Maybe a Sites.subset method would be useful here to get a
+                    # new Sites object with a subset of coords:
+                    pts = points_set.whose(**labels_match)
+                    points.append({
+                        'name': group_name.format(*i),
+                        'x': pts[0],
+                        'y': pts[1],
+                        'z': pts[2],
+                    })
+
+        boxes = []
+        for box_name, box in self.boxes.items():
+            coords = box.corner_coords
+            boxes.append({
+                'name': box_name,
+                'x': coords[0],
+                'y': coords[1],
+                'z': coords[2],
+            })
+
+        data = {
+            'points': points,
+            'boxes': boxes,
+        }
+
+        return data
+
     def visualise(self, group_points_by=None, group_boxes_by=None,
                   layout_args=None, target='interactive', backend='plotly'):
 
         group_points_by = self._validate_grouping(group_points_by)
-
-        fig = make_figure_func[backend](
-            self, layout_args, group_points_by)
+        plot_data = self._get_plot_data(group_points_by)
+        fig = make_figure_func[backend](plot_data, layout_args)
 
         return fig
 
