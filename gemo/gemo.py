@@ -238,10 +238,6 @@ class GeometryGroup(object):
                     group_name_fmt += '{}: {{}}; '.format(i)
                 group_name_fmt += ']'
 
-                all_styles = {k: v
-                              for i in group_points[points_name]
-                              for k, v in i.get('styles', {}).items()}
-
                 all_styles = {i['label']: i.get('styles', {})
                               for i in group_points[points_name]}
 
