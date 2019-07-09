@@ -8,7 +8,7 @@ from pprint import pprint
 
 from gemo.geometries import Box
 from gemo.backends import make_figure_func
-from gemo.utils import nest
+from gemo.utils import nest, validate_3d_vector
 
 
 class ViewOrientation(object):
@@ -23,12 +23,24 @@ class ViewOrientation(object):
 
     def __init__(self, look_at, up):
 
+        look_at = validate_3d_vector(look_at)
+        up = validate_3d_vector(up)
+
         # Normalise:
-        self.look_at = (look_at / np.linalg.norm(look_at)).flatten()
-        self.up = (up / np.linalg.norm(up)).flatten()
+        self.look_at = (look_at / np.linalg.norm(look_at))
+        self.up = (up / np.linalg.norm(up))
 
         if np.all(np.isclose(self.look_at, self.up)):
             raise ValueError('`look_at` and `up` cannot be the same!')
+
+    def __repr__(self):
+
+        out = '{}(look_at={!r}, up={!r})'.format(
+            self.__class__.__name__,
+            self.look_at,
+            self.up
+        )
+        return out
 
     @property
     def rotation_matrix(self):

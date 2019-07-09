@@ -6,6 +6,21 @@ import collections
 import numpy as np
 
 
+def validate_3d_vector(vector):
+
+    if not isinstance(vector, np.ndarray):
+        vector = np.array(vector)
+
+    if len(vector.shape) > 1:
+        vector = np.squeeze(vector)
+
+    if vector.shape != (3, ):
+        msg = ('Vector must be of size 3, not of size {}.')
+        raise ValueError(msg.format(vector.size))
+
+    return vector
+
+
 def update_dict(base, upd):
     """Update an arbitrarily-nested dict."""
 
