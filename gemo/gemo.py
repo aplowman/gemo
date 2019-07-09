@@ -269,7 +269,8 @@ class GeometryGroup(object):
 
         return data
 
-    def visualise(self, group_points=None, group_boxes=None, layout_args=None, target='interactive', backend='plotly'):
+    def visualise(self, group_points=None, group_boxes=None, layout_args=None,
+                  target='interactive', backend='plotly'):
 
         group_points = self._validate_points_grouping(group_points)
         plot_data = self._get_plot_data(group_points)
@@ -382,8 +383,8 @@ class GeometryGroup(object):
 
 class GeometryGroupProjection(object):
 
-    def __init__(self, view_frustum, points=None, boxes=None, vectors=None, label=None, bounding=None,
-                 point_labels=None):
+    def __init__(self, view_frustum, points=None, boxes=None, vectors=None,
+                 label=None, bounding=None, point_labels=None):
         """
         Parameters
         ----------
@@ -411,8 +412,9 @@ class GeometryGroupProjection(object):
         return NotImplementedError
         # make_my_fig(**vis)
 
-    def prepare_visual(self, plot_height=None, plot_width=None, pixels_per_unit=None, target='interactive',
-                       inview=True, world_coordinates=True, layout_args=None):
+    def prepare_visual(self, plot_height=None, plot_width=None,
+                       pixels_per_unit=None, target='interactive', inview=True,
+                       world_coordinates=True, layout_args=None):
         """
         inview : bool
             If True, only points in the viewing frustum are plotted.
