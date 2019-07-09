@@ -4,6 +4,7 @@ import numpy as np
 from vecmaths import geometry
 from spatial_sites import Sites
 from spatial_sites.utils import repr_dict
+from pprint import pprint
 
 from gemo.geometries import Box
 from gemo.backends import make_figure_func
@@ -140,55 +141,115 @@ class GeometryGroup(object):
 
         return boxes
 
-    def _validate_grouping(self, group_by_dict):
+    def _validate_points_grouping(self, group_dict):
 
-        if not group_by_dict:
+        ALLOWED_STYLES = [
+            'fill_colour',
+            'outline_colour',
+            'test',
+        ]
+
+        if not group_dict:
             return {}
 
-        for points_name, points_grouping in group_by_dict.items():
+        for points_name, points_grouping in group_dict.items():
             if points_name not in self.points:
                 msg = 'No points with name "{}" exist.'
                 raise ValueError(msg.format(points_name))
 
             if not isinstance(points_grouping, list):
                 msg = ('For points named "{}", specify the grouping labels as '
-                       'a list of strings.')
+                       'a list of dicts.')
                 raise ValueError(msg.format(points_name))
 
-            for label in points_grouping:
-                if label not in self.points[points_name].labels:
+            # Not allowed to repeat the same style for different labels:
+            used_styles = []
+
+            for i in points_grouping:
+                if 'label' not in i:
+                    msg = ('Must supply a points label by which to group the '
+                           'coordinates.')
+                    raise ValueError(msg)
+
+                if i['label'] not in self.points[points_name].labels:
                     msg = ('Cannot find points label named "{}" for the "{}" '
                            'points.')
-                    raise ValueError(msg.format(label, points_name))
+                    raise ValueError(msg.format(i['label'], points_name))
 
-        return group_by_dict
+                if 'styles' in i:
 
-    def _get_plot_data(self, group_points_by):
+                    label = self.points[points_name].labels[i['label']]
+                    unique_vals = label.unique_values
+
+                    for style_name, style_dict in i['styles'].items():
+
+                        if style_name not in ALLOWED_STYLES:
+                            msg = ('"{}" is not an allowed styles. Allowed '
+                                   'styles are: {}')
+                            raise ValueError(msg.format(
+                                style_name, ALLOWED_STYLES))
+
+                        if style_name in used_styles:
+                            msg = ('Style "{}" is used for multiple labels '
+                                   'for points named "{}".')
+                            raise ValueError(msg.format(
+                                style_name, points_name))
+                        else:
+                            used_styles.append(style_name)
+
+                        # check a value specified for each unique value:
+                        if set(style_dict.keys()) != set(unique_vals):
+                            msg = ('Specify style "{}" for each unique '
+                                   '"{}" value of the points named "{}". The '
+                                   'unique values are: {}.')
+                            raise ValueError(
+                                msg.format(style_name, i['label'], points_name,
+                                           unique_vals)
+                            )
+
+        return group_dict
+
+    def _get_plot_data(self, group_points):
 
         points = []
         for points_name, points_set in self.points.items():
 
-            if points_name in group_points_by:
+            if points_name in group_points:
                 # Split points into groups:
 
+                group_names = [i['label'] for i in group_points[points_name]]
                 uniq = [points_set.labels[i].unique_values
-                        for i in group_points_by[points_name]]
+                        for i in group_names]
 
-                group_name = '{}['.format(points_name)
-                for i in group_points_by[points_name]:
-                    group_name += '{}: {{}}; '.format(i)
-                group_name += ']'
+                group_name_fmt = '{}['.format(points_name)
+                for i in group_names:
+                    group_name_fmt += '{}: {{}}; '.format(i)
+                group_name_fmt += ']'
+
+                all_styles = {k: v
+                              for i in group_points[points_name]
+                              for k, v in i.get('styles', {}).items()}
+
+                all_styles = {i['label']: i.get('styles', {})
+                              for i in group_points[points_name]}
 
                 for i in nest(*uniq):
-                    labels_match = dict(zip(group_points_by[points_name], i))
+                    labels_match = dict(zip(group_names, i))
                     # Maybe a Sites.subset method would be useful here to get a
                     # new Sites object with a subset of coords:
                     pts = points_set.whose(**labels_match)
                     points.append({
-                        'name': group_name.format(*i),
+                        'name': group_name_fmt.format(*i),
                         'x': pts[0],
                         'y': pts[1],
                         'z': pts[2],
+                        'styles': {
+                            style_name: style_vals[
+                                i[group_names.index(label_name)]
+                            ]
+                            for label_name, label_styles in all_styles.items()
+                            for style_name, style_vals in label_styles.items()
+                        }
                     })
 
         boxes = []
@@ -208,11 +269,10 @@ class GeometryGroup(object):
 
         return data
 
-    def visualise(self, group_points_by=None, group_boxes_by=None,
-                  layout_args=None, target='interactive', backend='plotly'):
+    def visualise(self, group_points=None, group_boxes=None, layout_args=None, target='interactive', backend='plotly'):
 
-        group_points_by = self._validate_grouping(group_points_by)
-        plot_data = self._get_plot_data(group_points_by)
+        group_points = self._validate_points_grouping(group_points)
+        plot_data = self._get_plot_data(group_points)
         fig = make_figure_func[backend](plot_data, layout_args)
 
         return fig

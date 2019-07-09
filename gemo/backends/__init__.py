@@ -7,3 +7,6 @@ make_figure_func = {
     'plotly': make_figure_plotly,
     # 'matplotlib': make_figure_mpl,
 }
+
+# Might want to add a support-matrix here that states which backends support
+# which "styles" (e.g. `fill_color`, `outline_color` etc).

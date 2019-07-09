@@ -1,8 +1,35 @@
 '`gemo.utils.py`'
 
 import copy
+import collections
 
 import numpy as np
+
+
+def update_dict(base, upd):
+    """Update an arbitrarily-nested dict."""
+
+    for key, val in upd.items():
+        if isinstance(base, collections.Mapping):
+            if isinstance(val, collections.Mapping):
+                r = update_dict(base.get(key, {}), val)
+                base[key] = r
+            else:
+                base[key] = upd[key]
+        else:
+            base = {key: upd[key]}
+
+    return base
+
+
+def set_in_dict(base, address, value):
+
+    val_dict_sub = base
+    for idx, sub_dict in enumerate(address):
+        if idx < len(address) - 1:
+            val_dict_sub = val_dict_sub[sub_dict]
+        else:
+            val_dict_sub[sub_dict] = value
 
 
 def nest(*lists, return_index=False):
