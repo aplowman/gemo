@@ -68,12 +68,9 @@ class Box(object):
             origin = np.zeros((3, 1))
         else:
             if isinstance(origin, list):
-                print('origin: ', origin)
                 origin = np.array(origin)
-
             elif not isinstance(origin, np.ndarray):
                 raise ValueError('`origin` must be a list or ndarray.')
-
             origin = np.squeeze(origin)[:, None]
 
         if origin.size != 3:
