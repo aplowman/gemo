@@ -79,6 +79,12 @@ class Box(object):
 
         self._origin = origin
 
+    def rotate(self, rot_mat):
+        'Rotate the box.'
+
+        self.edge_vectors = rot_mat @ self.edge_vectors
+        self.origin = rot_mat @ self.origin
+
     @property
     def corner_coords(self):
         'Get the coordinates of the corners.'
