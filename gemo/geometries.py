@@ -8,12 +8,9 @@ class Box(object):
 
     def __init__(self, edge_vectors, origin=None, edge_labels=None):
 
-        edge_vectors, origin = self._validate(edge_vectors, origin)
-        edge_labels = self._validate_edge_labels(edge_labels)
-
-        self.edge_vectors = edge_vectors
+        self.edge_vectors = self._validate_edge_vectors(edge_vectors)
+        self.edge_labels = self._validate_edge_labels(edge_labels)
         self.origin = origin
-        self.edge_labels = edge_labels
 
     def __repr__(self):
 
@@ -40,7 +37,7 @@ class Box(object):
         )
         return out
 
-    def _validate(self, edge_vectors, origin):
+    def _validate_edge_vectors(self, edge_vectors):
 
         if not isinstance(edge_vectors, np.ndarray):
             edge_vectors = np.array(edge_vectors)
@@ -49,20 +46,7 @@ class Box(object):
             msg = '`edge_vectors` must have shape (3, 3), not {}'
             raise ValueError(msg.format(edge_vectors.shape))
 
-        if origin is None:
-            origin = np.zeros((3, 1))
-        else:
-
-            if not isinstance(origin, np.ndarray):
-                origin = np.ndarray(origin)
-
-            origin = np.squeeze(origin)[:, None]
-
-        if origin.size != 3:
-            msg = '`origin` must have size 3, not {}'
-            raise ValueError(msg.format(origin.size))
-
-        return edge_vectors, origin
+        return edge_vectors
 
     def _validate_edge_labels(self, edge_labels):
 
@@ -72,6 +56,31 @@ class Box(object):
                 raise ValueError(msg)
 
         return edge_labels
+
+    @property
+    def origin(self):
+        return self._origin
+
+    @origin.setter
+    def origin(self, origin):
+
+        if origin is None:
+            origin = np.zeros((3, 1))
+        else:
+            if isinstance(origin, list):
+                print('origin: ', origin)
+                origin = np.array(origin)
+
+            elif not isinstance(origin, np.ndarray):
+                raise ValueError('`origin` must be a list or ndarray.')
+
+            origin = np.squeeze(origin)[:, None]
+
+        if origin.size != 3:
+            msg = '`origin` must have size 3, not {}'
+            raise ValueError(msg.format(origin.size))
+
+        self._origin = origin
 
     @property
     def corner_coords(self):
