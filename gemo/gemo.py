@@ -396,6 +396,22 @@ class GeometryGroup(object):
 
         return ggp
 
+    @property
+    def bounding_coordinates(self):
+        'Get the orthogonal bounding box minima and maxima in each dimension.'
+
+        # Concatenate all points and box coordinates:
+        points = np.hstack([i._coords for i in self.points.values()])
+        box_coords = np.hstack([i.corner_coords for i in self.boxes.values()])
+        all_coords = np.hstack([points, box_coords])
+
+        out = np.array([
+            np.min(all_coords, axis=1),
+            np.max(all_coords, axis=1)
+        ])
+
+        return out
+
 
 class GeometryGroupProjection(object):
 
