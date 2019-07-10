@@ -277,8 +277,8 @@ class GeometryGroup(object):
 
         return data
 
-    def visualise(self, group_points=None, group_boxes=None, layout_args=None,
-                  target='interactive', backend='plotly'):
+    def show(self, group_points=None, group_boxes=None, layout_args=None,
+             target='interactive', backend='plotly'):
 
         group_points = self._validate_points_grouping(group_points)
         plot_data = self._get_plot_data(group_points)
@@ -414,7 +414,7 @@ class GeometryGroupProjection(object):
         self.label = label
         self.bounding = bounding
 
-    def visualise(self, **kwargs):
+    def show(self, **kwargs):
 
         vis = self.prepare_visual(**kwargs)
         return NotImplementedError
