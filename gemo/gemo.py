@@ -121,6 +121,11 @@ class GeometryGroup(object):
         )
         return out
 
+    def __copy__(self):
+        points = copy.deepcopy(self.points)
+        boxes = copy.deepcopy(self.boxes)
+        return GeometryGroup(points=points, boxes=boxes)
+
     def _validate_points(self, points):
 
         if not points:
@@ -276,6 +281,9 @@ class GeometryGroup(object):
         }
 
         return data
+
+    def copy(self):
+        return self.__copy__()
 
     def show(self, group_points=None, group_boxes=None, layout_args=None,
              target='interactive', backend='plotly'):
