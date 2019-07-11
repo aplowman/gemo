@@ -6,6 +6,13 @@ import collections
 import numpy as np
 
 
+def intersperse(lst, item):
+    'Add a given item between each existing item in a list.'
+    result = [item] * (len(lst) * 2 - 1)
+    result[0::2] = lst
+    return result
+
+
 def validate_3d_vector(vector):
 
     if not isinstance(vector, np.ndarray):
