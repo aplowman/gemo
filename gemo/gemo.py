@@ -1,12 +1,14 @@
 '`gemo.gemo.py`'
 
+import copy
+from pprint import pprint
+
 import numpy as np
 from vecmaths import geometry
 from spatial_sites import Sites
 from spatial_sites.utils import repr_dict
-from pprint import pprint
 
-from gemo.geometries import Box
+from gemo.geometries import Box, ProjectedBox
 from gemo.backends import make_figure_func
 from gemo.utils import nest, validate_3d_vector
 
@@ -275,7 +277,7 @@ class GeometryGroup(object):
 
         boxes = []
         for box_name, box in self.boxes.items():
-            coords = box.corner_coords
+            coords = box.edge_vertices
             boxes.append({
                 'name': box_name,
                 'x': coords[0],
@@ -302,104 +304,83 @@ class GeometryGroup(object):
 
         return fig
 
+    def rotate(self, rot_mat):
+        'Rotate according to a rotation matrix.'
+
+        # Rotate points coords:
+        points = {}
+        for points_name, points_set in self.points.items():
+            points_set.transform(rot_mat)
+            points.update({points_name: points_set})
+        self.points = points
+
+        # Rotate boxes:
+        boxes = {}
+        for box_name, box in self.boxes.items():
+            box.rotate(rot_mat)
+            boxes.update({box_name: box})
+        self.boxes = boxes
+
     def project(self, view_orientation, left=None, right=None, bottom=None,
                 top=None, near=None, far=None, label=None):
+        """
+        TODO:
 
-        rot_mat = view_orientation.rotation_matrix
+        """
 
-        # Rotate coordinates
-        points_rot = []
-        for point_set in self.points:
-            p_rot = np.dot(rot_mat, point_set)
-            points_rot.append(p_rot)
+        # For convenience of rotation everything together, create a copy:
+        geom_group = self.copy()
+        geom_group.rotate(view_orientation.rotation_matrix)
+        min_coords, max_coords = self.bounding_coordinates.T
 
-        # print('points_rot[0]: \n{}\n'.format(points_rot[0]))
-
-        boxes_rot = []
-        for box in self.boxes:
-            b_rot = np.dot(rot_mat, box)
-            boxes_rot.append(b_rot)
-
-        # Get boxes vertices
-        boxes_verts = []
-        for box in boxes_rot:
-            b_verts = geometry.get_box_xyz(box)[0]
-            boxes_verts.append(b_verts)
-
-        # Get global bounding box:
-        all_coords = np.concatenate(points_rot + boxes_verts, axis=1)
-        minimums = np.min(all_coords, axis=1)
-        maximums = np.max(all_coords, axis=1)
-
-        print('minimums: {}'.format(minimums))
-        print('maximums: {}'.format(maximums))
-
-        # (Later: could do above with a GeometryGroup.rotate method which generates a copy)
-
-        # Set viewing frustum planes to bounding box if not specified
+        # If not specified, set viewing frustum planes to bounding box extrema:
         if not left:
-            left = minimums[0]
+            left = min_coords[0]
         if not right:
-            right = maximums[0]
+            right = max_coords[0]
         if not bottom:
-            bottom = minimums[1]
+            bottom = min_coords[1]
         if not top:
-            top = maximums[1]
+            top = max_coords[1]
         if not near:
-            near = -maximums[2]
+            near = -max_coords[2]
         if not far:
-            far = -minimums[2]
+            far = -min_coords[2]
 
         # Get projection matrix
         view_frustum = ViewFrustum(left, right, top, bottom, near, far)
-        proj_mat = view_frustum.projection_matrix
 
-        # Transform to homogeneous coordinates and project
-        points_proj = []
-        points_inview = []
-        for point_set in points_rot:
+        # Generate new points objects using homogeneous coordinates:
+        points = {}
+        for points_name, points_set in geom_group.points.items():
 
-            p_homo = np.vstack([
-                point_set, np.ones((1, point_set.shape[1]))
+            coords_homo = np.vstack([
+                points_set._coords, np.ones(len(points_set))
             ])
-            p_proj = np.dot(proj_mat, p_homo)
-
-            inside_idx = np.where(
-                np.all(
-                    np.logical_and(
-                        p_proj <= 1,
-                        p_proj >= -1
-                    ),
-                    axis=0
-                )
-            )[0]
-            points_inview.append(inside_idx)
-            points_proj.append(p_proj)
-
-        points = {
-            'rotated': points_rot,
-            'projected': points_proj,
-            'inview_idx': points_inview,
-        }
-
-        boxes_proj = []
-        for box in boxes_verts:
-
-            b_homo = np.vstack([
-                box, np.ones((1, box.shape[1]))
-            ])
-            # print('b_homo: \n{}\n'.format(b_homo))
-            b_proj = np.dot(proj_mat, b_homo)
-            boxes_proj.append(b_proj)
+            new_sites = Sites(
+                coords=coords_homo,
+                labels=copy.deepcopy(points_set.labels),
+                basis=view_frustum.projection_matrix,
+                vector_direction='column',
+                dimension=4,
+            )
+            # Add label to record which points are within the frustum:
+            coords_proj = new_sites.get_coords(new_basis=None)
+            in_view = np.all(np.logical_and(
+                coords_proj <= 1, coords_proj >= -1), axis=0)
+            new_sites.add_labels(in_view=in_view)
+            points.update({points_name: new_sites})
 
         boxes = {
-            'rotated': boxes_verts,
-            'projected': boxes_proj,
+            box_name: ProjectedBox(box, view_frustum)
+            for box_name, box in geom_group.boxes.items()
         }
 
         ggp = GeometryGroupProjection(
-            view_frustum, points=points, point_labels=self.point_labels, boxes=boxes,
-            label=label, bounding={'min': minimums, 'max': maximums}
+            view_frustum,
+            points=points,
+            boxes=boxes,
+            bounding={'min': min_coords, 'max': max_coords},
         )
 
         return ggp
@@ -410,47 +391,45 @@ class GeometryGroup(object):
 
         # Concatenate all points and box coordinates:
         points = np.hstack([i._coords for i in self.points.values()])
-        box_coords = np.hstack([i.corner_coords for i in self.boxes.values()])
+        box_coords = np.hstack([i.vertices for i in self.boxes.values()])
         all_coords = np.hstack([points, box_coords])
 
         out = np.array([
             np.min(all_coords, axis=1),
             np.max(all_coords, axis=1)
-        ])
+        ]).T
 
         return out
 
 
 class GeometryGroupProjection(object):
 
-    def __init__(self, view_frustum, points=None, boxes=None, vectors=None,
-                 label=None, bounding=None, point_labels=None):
+    def __init__(self, view_frustum, points=None, boxes=None, label=None,
+                 bounding=None):
         """
         Parameters
         ----------
         points : dict
-            Keys:
-                rotated
-                projected
-                inview_idx
+            Dict whose keys are points names and values are projected points
+            objects
         boxes : dict
-            Keys:
-                rotated
-                projected        
+            Dict whose keys are box names and values are ProjectedBox objects.
         """
+
         self.view_frustum = view_frustum
         self.points = points
-        self.point_labels = point_labels or {}
         self.boxes = boxes
-        self.vectors = vectors
         self.label = label
         self.bounding = bounding
 
-    def show(self, **kwargs):
+    def preview(self, clip=False):
+        """Show the GeometryGroup in 3D, including the viewing frustum and
+        camera vectors, optionally cutting off objects outside the frustum."""
+        pass
 
-        vis = self.prepare_visual(**kwargs)
+    def show(self, **kwargs):
+        'Generate a Figure of this 2D projection.'
         return NotImplementedError
-        # make_my_fig(**vis)
 
     def prepare_visual(self, plot_height=None, plot_width=None,
                        pixels_per_unit=None, target='interactive', inview=True,
