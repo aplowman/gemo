@@ -69,6 +69,14 @@ class ViewFrustum(object):
         self.near = near
         self.far = far
 
+        self.box = Box(
+            edge_vectors=np.array([
+                [right - left, 0, 0],
+                [0, top - bottom, 0],
+                [0, 0, far - near],
+            ]).T
+        )
+
     @property
     def width(self):
         return self.right - self.left
