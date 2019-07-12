@@ -52,11 +52,11 @@ class Plane(object):
             # Line segment lies in plane
             intersection = True
 
-        elif ds * de < 0:
+        elif ds * de > 0:
             # Line segment does not intersect plane
             intersection = False
 
-        elif ds * de >= 0:
+        elif ds * de <= 0:
             # Line segment intersects plane (or starts/ends in plane)
 
             # Get unit vector along line segment:
