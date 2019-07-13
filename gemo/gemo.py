@@ -80,6 +80,19 @@ class ViewFrustum(object):
             origin=[left, bottom, near]
         )
 
+    def __repr__(self):
+        out = ('{}(left={}, right={}, bottom={}, '
+               'top={}, near={}, far={})').format(
+                   self.__class__.__name__,
+                   self.left,
+                   self.right,
+                   self.bottom,
+                   self.top,
+                   self.near,
+                   self.far,
+        )
+        return out
+
     @property
     def width(self):
         return self.right - self.left
