@@ -76,7 +76,8 @@ class ViewFrustum(object):
                 [right - left, 0, 0],
                 [0, top - bottom, 0],
                 [0, 0, far - near],
-            ]).T
+            ]).T,
+            origin=[left, bottom, near]
         )
 
     @property
