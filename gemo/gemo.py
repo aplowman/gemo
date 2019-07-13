@@ -331,7 +331,7 @@ class GeometryGroup(object):
         # For convenience of rotation everything together, create a copy:
         geom_group = self.copy()
         geom_group.rotate(view_orientation.rotation_matrix)
-        min_coords, max_coords = self.bounding_coordinates.T
+        min_coords, max_coords = geom_group.bounding_coordinates.T
 
         # If not specified, set viewing frustum planes to bounding box extrema:
         if not left:
