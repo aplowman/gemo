@@ -15,6 +15,9 @@ def intersperse(lst, item):
 
 def validate_3d_vector(vector):
 
+    if vector is None:
+        vector = [0, 0, 0]
+
     if not isinstance(vector, np.ndarray):
         vector = np.array(vector)
 
