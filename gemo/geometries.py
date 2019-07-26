@@ -268,19 +268,50 @@ class ProjectedBox(object):
 
         frustum_planes = self.view_frustum.box.get_face_planes()
 
-        for edge_group in self.box.edge_idx_traces:
+        all_verts = []
+        for eg_idx, edge_group in enumerate(self.box.edge_idx_traces):
 
+            verts = []
             for edge_idx in edge_group:
-                print('edge_idx: {}'.format(edge_idx))
 
-                plane_intersects = []
-                for plane in frustum_planes:
-                    #print('plane: {}'.format(plane))
-                    intersect = plane.line_segment_intersection(
-                        self.box.vertices[:, edge_idx[0]],
-                        self.box.vertices[:, edge_idx[1]],
-                    )
-                    print('intersect: {}'.format(intersect))
+                edge_start = self.box.vertices[:, edge_idx[0]]
+                edge_end = self.box.vertices[:, edge_idx[1]]
+
+                edge_start_proj = verts_proj[:, edge_idx[0]]
+                edge_end_proj = verts_proj[:, edge_idx[1]]
+
+                print('\nedge_idx: {}'.format(edge_idx))
+                print('edge start: {}\nedge end: {}'.format(edge_start, edge_end))
+                print('edge start (proj): {}\nedge end (proj): {}'.format(
+                    edge_start_proj, edge_end_proj))
+
+                edge_start_in = in_view[edge_idx[0]]
+                edge_end_in = in_view[edge_idx[1]]
+
+                # If both vertices of edge are within frustum, keep whole edge:
+                if edge_start_in and edge_end_in:
+                    print('edge is fully within box.')
+                    verts.extend([edge_start, edge_end])
+                else:
+                    print('edge is not fully within box.')
+
+                    print('edge_start_in: {}'.format(edge_start_in))
+                    print('edge_end_in: {}'.format(edge_end_in))
+
+                    plane_intersects = [
+                        plane.line_segment_intersection(edge_start, edge_end)
+                        for plane in frustum_planes
+                    ]
+                    print('plane_intersects: {}\n'.format(plane_intersects))
+
+            if eg_idx > 0:
+                all_verts.append(np.array([np.nan] * 3))
+
+            all_verts.extend(verts)
+
+        all_verts = np.vstack(all_verts)
+        print('all_verts: \n{}\n'.format(all_verts))
+
         # planes = ...
         # For each edge (line segment), find where (or whether) it intersects
         # with the viewing frustum...
