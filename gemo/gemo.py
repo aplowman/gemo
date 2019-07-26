@@ -259,8 +259,7 @@ class GeometryGroup(object):
                 # Split points into groups:
 
                 group_names = [i['label'] for i in group_points[points_name]]
-                uniq = [points_set.labels[i].unique_values
-                        for i in group_names]
+                uniq = [points_set.labels[i].unique_values for i in group_names]
 
                 group_name_fmt = '{}['.format(points_name)
                 for i in group_names:
@@ -281,9 +280,7 @@ class GeometryGroup(object):
                         'y': pts[1],
                         'z': pts[2],
                         'styles': {
-                            style_name: style_vals[
-                                i[group_names.index(label_name)]
-                            ]
+                            style_name: style_vals[i[group_names.index(label_name)]]
                             for label_name, label_styles in all_styles.items()
                             for style_name, style_vals in label_styles.items()
                         }
