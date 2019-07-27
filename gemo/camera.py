@@ -139,10 +139,14 @@ class Camera(object):
 
             # Get unique intersection points:
             int_param = intersect_param[line_idx]
-            uniq_int_param = np.unique(
+            uniq_int_param_all = np.unique(
                 np.round(int_param[~np.isnan(int_param)], decimals=8))
-            #print('int_param: {}'.format(int_param))
-            #print('uniq_int_param: {}'.format(uniq_int_param))
+            remove_ends_idx = np.logical_or(np.isclose(uniq_int_param_all, 0),
+                                            np.isclose(uniq_int_param_all, 1))
+            uniq_int_param = uniq_int_param_all[~remove_ends_idx]
+
+            # print('int_param: {}'.format(int_param))
+            # print('uniq_int_param: {}'.format(uniq_int_param))
 
             if uniq_int_param.size:
 
