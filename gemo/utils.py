@@ -106,3 +106,31 @@ def nest(*lists, return_index=False):
         return (nested_list, idx)
     else:
         return nested_list
+
+
+def to_4d_array(arr):
+
+    out = np.vstack([
+        np.hstack([arr, np.zeros((3, 1))]),
+        [0, 0, 0, 1]
+    ])
+
+    return out
+
+
+def point_on_line(start, end, parameter):
+    'Return the point on a parametrically defined line.'
+    point = (end - start) * parameter + start
+    return point
+
+
+def get_lines_trace(lines):
+    'Get a trace suitable for plotting lines.'
+
+    if not lines.size:
+        out = np.zeros((4, 0))
+    else:
+        nannys = np.ones((len(lines), lines.shape[1], 1)) * np.nan
+        out = np.hstack(np.concatenate([lines, nannys], axis=2))
+
+    return out
