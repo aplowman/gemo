@@ -61,9 +61,9 @@ class Camera(object):
 
     def __init__(self, look_at, up, look_from=None):
 
-        self.look_at = validate_3d_vector(look_at)
-        self.look_from = validate_3d_vector(look_from)
-        self.up = validate_3d_vector(up)
+        self.look_at = validate_3d_vector(look_at).astype(float)
+        self.look_from = validate_3d_vector(look_from).astype(float)
+        self.up = validate_3d_vector(up).astype(float)
 
     @property
     def camera_transform(self):
