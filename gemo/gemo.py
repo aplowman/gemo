@@ -258,7 +258,8 @@ class GeometryGroup(object):
         # Concatenate all points and box coordinates:
         points = np.hstack([i._coords for i in self.points.values()])
         box_coords = np.hstack([i.vertices for i in self.boxes.values()])
-        all_coords = np.hstack([points, box_coords])
+        line_coords = np.hstack(self.lines.values())
+        all_coords = np.hstack([points, box_coords, line_coords])
 
         out = np.array([
             np.min(all_coords, axis=1),
