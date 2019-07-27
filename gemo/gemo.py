@@ -15,26 +15,30 @@ from gemo.utils import nest, validate_3d_vector
 
 class GeometryGroup(object):
 
-    def __init__(self, points=None, boxes=None):
+    def __init__(self, points=None, boxes=None, lines=None):
 
         self.points = self._validate_points(points)
         self.boxes = self._validate_boxes(boxes)
+        self.lines = self._validate_lines(lines)
 
     def __repr__(self):
 
         points = repr_dict(self.points, indent=4)
         boxes = repr_dict(self.boxes, indent=4)
+        lines = repr_dict(self.lines, indent=4)
 
         indent = ' ' * 4
         out = (
             '{0}(\n'
             '{1}points={2},\n'
             '{1}boxes={3},\n'
+            '{1}lines={4},\n'
             ')'.format(
                 self.__class__.__name__,
                 indent,
                 points,
                 boxes,
+                lines,
             )
         )
         return out
@@ -42,15 +46,16 @@ class GeometryGroup(object):
     def __copy__(self):
         points = copy.deepcopy(self.points)
         boxes = copy.deepcopy(self.boxes)
-        return GeometryGroup(points=points, boxes=boxes)
+        lines = copy.deepcopy(self.lines)
+        return GeometryGroup(points=points, boxes=boxes, lines=lines)
 
     def _validate_points(self, points):
 
         if not points:
             return {}
 
-        msg = ('`points` must be a dict whose keys are strings and whose '
-               'values are `Sites` objects.')
+        msg = ('`points` must be a dict whose keys are strings and whose values are '
+               '`Sites` objects.')
         if not isinstance(points, dict):
             raise ValueError(msg)
 
@@ -65,8 +70,8 @@ class GeometryGroup(object):
         if not boxes:
             return {}
 
-        msg = ('`boxes` must be a dict whose keys are strings and whose '
-               'values are `Box` objects.')
+        msg = ('`boxes` must be a dict whose keys are strings and whose values are '
+               '`Box` objects.')
         if not isinstance(boxes, dict):
             raise ValueError(msg)
 
@@ -75,6 +80,22 @@ class GeometryGroup(object):
                 raise ValueError(msg)
 
         return boxes
+
+    def _validate_lines(self, lines):
+
+        if not lines:
+            return {}
+
+        msg = ('`lines` must be a dict whose keys are strings and whose values are '
+               '`ndarray`s of shape (N, 3, 2).')
+        if not isinstance(lines, dict):
+            raise ValueError(msg)
+
+        for val in lines.values():
+            if not isinstance(val, np.ndarray) or val.shape[1:] != (3, 2):
+                raise ValueError(msg)
+
+        return lines
 
     def _validate_points_grouping(self, group_dict):
 
@@ -225,6 +246,10 @@ class GeometryGroup(object):
             box.rotate(rot_mat)
             boxes.update({box_name: box})
         self.boxes = boxes
+
+        # Rotate lines:
+        for lines_name, lines in self.lines.items():
+            self.lines[lines_name] = rot_mat @ lines
 
     def project(self, view_orientation, left=None, right=None, bottom=None,
                 top=None, near=None, far=None, label=None):
