@@ -58,6 +58,13 @@ def make_figure(data, layout_args):
             'mode': 'lines',
         })
 
+    for i in data['lines']:
+        plot_data.append({
+            **i,
+            'type': 'scatter3d',
+            'mode': 'lines',
+        })
+
     if layout_args is None:
         layout_args = {}
 

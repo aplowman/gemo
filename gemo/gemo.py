@@ -10,7 +10,7 @@ from spatial_sites.utils import repr_dict
 
 from gemo.geometries import Box, ProjectedBox
 from gemo.backends import make_figure_func
-from gemo.utils import nest, validate_3d_vector
+from gemo.utils import nest, validate_3d_vector, get_lines_trace
 
 
 class GeometryGroup(object):
@@ -211,9 +211,20 @@ class GeometryGroup(object):
                 'z': coords[2],
             })
 
+        lines = []
+        for ln_name, ln in self.lines.items():
+            ln_trace = get_lines_trace(ln)
+            lines.append({
+                'name': ln_name,
+                'x': ln_trace[0],
+                'y': ln_trace[1],
+                'z': ln_trace[2],
+            })
+
         data = {
             'points': points,
             'boxes': boxes,
+            'lines': lines,
         }
 
         return data
@@ -221,8 +232,8 @@ class GeometryGroup(object):
     def copy(self):
         return self.__copy__()
 
-    def show(self, group_points=None, group_boxes=None, layout_args=None,
-             target='interactive', backend='plotly'):
+    def show(self, group_points=None, layout_args=None, target='interactive',
+             backend='plotly'):
 
         group_points = self._validate_points_grouping(group_points)
         plot_data = self._get_plot_data(group_points)
