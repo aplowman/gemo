@@ -39,37 +39,50 @@ def extract_styles(trace_dict):
     return new_styles
 
 
-def make_figure(data, layout_args):
+def make_figure(data, layout_args, dimension):
+
+    scatter_type = 'scatter3d' if dimension == 3 else 'scattergl'
 
     plot_data = []
-    for i in data['points']:
-        styles = extract_styles(i)
-        plot_data.append({
-            **i,
-            **styles,
-            'type': 'scatter3d',
-            'mode': 'markers',
-        })
 
     for i in data['boxes']:
         plot_data.append({
             **i,
-            'type': 'scatter3d',
+            'type': scatter_type,
             'mode': 'lines',
         })
 
     for i in data['lines']:
         plot_data.append({
             **i,
-            'type': 'scatter3d',
+            'type': scatter_type,
             'mode': 'lines',
+        })
+
+    for i in data['points']:
+        styles = extract_styles(i)
+        plot_data.append({
+            **i,
+            **styles,
+            'type': scatter_type,
+            'mode': 'markers',
         })
 
     if layout_args is None:
         layout_args = {}
 
-    layout_args.update({
-        'plotly_args': {
+    plotly_args = {
+        'xaxis': layout_args.get('xaxis', {}),
+        'yaxis': layout_args.get('yaxis', {}),
+    }
+
+    if dimension == 2:
+        plotly_args['xaxis'].update({
+            'scaleanchor': 'y',
+        })
+
+    elif dimension == 3:
+        plotly_args.update({
             'scene': {
                 'aspectmode': 'data',
                 'camera': {
@@ -78,8 +91,7 @@ def make_figure(data, layout_args):
                     }
                 }
             }
-        }
-    })
+        })
 
-    fig = go.FigureWidget(data=plot_data, layout=layout_args['plotly_args'])
+    fig = go.FigureWidget(data=plot_data, layout=plotly_args)
     return fig

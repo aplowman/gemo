@@ -1,5 +1,7 @@
 '`gemo.geometries.py'
 
+import copy
+
 import numpy as np
 from vecmaths import geometry
 
@@ -79,7 +81,14 @@ class Box(object):
 
         self.edge_vectors = self._validate_edge_vectors(edge_vectors)
         self.edge_labels = self._validate_edge_labels(edge_labels)
-        self.origin = origin
+        self._origin = self._validate_origin(origin)
+
+        # print('box init')
+        # print('edge_vectors: \n{}\n'.format(edge_vectors))
+        # print('origin: \n{}\n'.format(origin))
+        # print('edge_labels: \n{}\n'.format(edge_labels))
+
+        self.edges = self._get_edges()
 
     def __repr__(self):
 
@@ -106,6 +115,16 @@ class Box(object):
         )
         return out
 
+    def __copy__(self):
+        # print('copying')
+        box = Box(
+            edge_vectors=np.copy(self.edge_vectors),
+            edge_labels=copy.copy(self.edge_labels),
+        )
+        # Preserve edges since they may have been modified:
+        box.edges = np.copy(self.edges)
+        return box
+
     def _validate_edge_vectors(self, edge_vectors):
 
         if not isinstance(edge_vectors, np.ndarray):
@@ -117,21 +136,7 @@ class Box(object):
 
         return edge_vectors
 
-    def _validate_edge_labels(self, edge_labels):
-
-        if edge_labels is not None:
-            if not isinstance(edge_labels, list) or len(edge_labels) != 3:
-                msg = '`edge_labels` must be a list of length three.'
-                raise ValueError(msg)
-
-        return edge_labels
-
-    @property
-    def origin(self):
-        return self._origin
-
-    @origin.setter
-    def origin(self, origin):
+    def _validate_origin(self, origin):
 
         if origin is None:
             origin = np.zeros((3, 1))
@@ -146,184 +151,50 @@ class Box(object):
             msg = '`origin` must have size 3, not {}'
             raise ValueError(msg.format(origin.size))
 
-        self._origin = origin
+        return origin
 
-    def rotate(self, rot_mat):
-        'Rotate the box.'
+    def _validate_edge_labels(self, edge_labels):
 
-        self.edge_vectors = rot_mat @ self.edge_vectors
-        self.origin = rot_mat @ self.origin
+        #print('_validate_edge_labels:: edge_labels: {}'.format(edge_labels))
+
+        if edge_labels is not None:
+            if not isinstance(edge_labels, list) or len(edge_labels) != 3:
+                msg = '`edge_labels` must be a list of length three.'
+                raise ValueError(msg)
+
+        return edge_labels
+
+    def _get_edges(self):
+        'Get vertices fo line segments representing the box edges.'
+
+        verts = self.vertices
+        edges = [
+            verts[:, [0, 1]],
+            verts[:, [1, 4]],
+            verts[:, [4, 2]],
+            verts[:, [2, 0]],
+            verts[:, [3, 5]],
+            verts[:, [5, 7]],
+            verts[:, [7, 6]],
+            verts[:, [6, 3]],
+            verts[:, [1, 5]],
+            verts[:, [3, 0]],
+            verts[:, [4, 7]],
+            verts[:, [6, 2]],
+        ]
+        return np.array(edges)
+
+    @property
+    def origin(self):
+        return self._origin
 
     @property
     def vertices(self):
         'Get the coordinates of the corners.'
+        # print('vertices::')
+        #print('self.edge_vectors: \n{}\n'.format(self.edge_vectors))
+        #print('self.origin: \n{}\n'.format(self.origin))
         return geometry.get_box_corners(self.edge_vectors, self.origin)[0]
 
-    @property
-    def edge_idx_traces(self):
-        'Return groups of vertex indices that form continuous traces.'
-        return [
-            [
-                [0, 1],
-                [1, 4],
-                [4, 2],
-                [2, 0],
-            ],
-            [
-                [3, 5],
-                [5, 7],
-                [7, 6],
-                [6, 3],
-            ],
-            [
-                [0, 3],
-            ],
-            [
-                [1, 5],
-            ],
-            [
-                [4, 7],
-            ],
-            [
-                [2, 6],
-            ],
-        ]
-
-    @property
-    def edge_idx(self):
-        'Get an array of indices of vertices that form edges.'
-        return np.concatenate(self.edge_idx_traces)
-
-    def get_edge_vectors(self):
-        'Get vectors that translate from initial to final vertex of each edge.'
-        pass
-
-    def get_face_planes(self):
-        'Get the planes that define the faces of the box.'
-
-        verts = self.vertices
-        faces_verts = [
-            verts[:, [0, 1, 4, 2, 0]],
-            verts[:, [3, 5, 7, 6, 3]],
-            verts[:, [0, 1, 5, 3, 0]],
-            verts[:, [2, 4, 7, 6, 2]],
-            verts[:, [0, 2, 6, 3, 0]],
-            verts[:, [1, 4, 7, 5, 1]],
-        ]
-
-        planes = []
-        for face in faces_verts:
-            point = face[:, 0]
-            norm = np.cross(face[:, 1] - face[:, 0], face[:, 2] - face[:, 0])
-            planes.append(Plane(point=point, normal_vector=norm))
-
-        return planes
-
-    @property
-    def edge_vertices(self):
-        'Get an array of vertices that form a trace for plotting.'
-
-        all_verts = []
-        for i in self.edge_idx_traces:
-            verts_idx = np.concatenate(i)
-            verts_idx = np.concatenate([verts_idx[:2],
-                                        np.roll(verts_idx, -1)[2::2]])
-            verts_idx = np.append(verts_idx, verts_idx[0])
-            all_verts.append(self.vertices[:, verts_idx])
-
-        # Insert np.nan columns to represent a break in the trace:
-        all_verts = intersperse(all_verts, np.array([[np.nan] * 3]).T)
-        vertices = np.hstack(all_verts)
-
-        return vertices
-
-
-class ProjectedBox(object):
-    'A parallelepiped that has been projected into 2D.'
-
-    def __init__(self, box, view_frustum):
-        """
-        Parameters
-        ----------
-        box : Box
-        view_frustum : ViewFrustum
-
-        """
-
-        self.box = box
-        self.view_frustum = view_frustum
-
-        self._set_projection_attributes()
-
-    def _set_projection_attributes(self):
-
-        verts_homo = np.vstack([self.box.vertices, np.ones(8)])
-        verts_proj = self.view_frustum.projection_matrix @ verts_homo
-
-        # Which vertices are within the frustum:
-        in_view = np.all(np.logical_and(
-            verts_proj <= 1, verts_proj >= -1), axis=0)
-
-        self.vertices_proj = verts_proj
-
-        frustum_planes = self.view_frustum.box.get_face_planes()
-
-        all_verts = []
-        for eg_idx, edge_group in enumerate(self.box.edge_idx_traces):
-
-            verts = []
-            for edge_idx in edge_group:
-
-                edge_start = self.box.vertices[:, edge_idx[0]]
-                edge_end = self.box.vertices[:, edge_idx[1]]
-
-                edge_start_proj = verts_proj[:, edge_idx[0]]
-                edge_end_proj = verts_proj[:, edge_idx[1]]
-
-                print('\nedge_idx: {}'.format(edge_idx))
-                print('edge start: {}\nedge end: {}'.format(edge_start, edge_end))
-                print('edge start (proj): {}\nedge end (proj): {}'.format(
-                    edge_start_proj, edge_end_proj))
-
-                edge_start_in = in_view[edge_idx[0]]
-                edge_end_in = in_view[edge_idx[1]]
-
-                # If both vertices of edge are within frustum, keep whole edge:
-                if edge_start_in and edge_end_in:
-                    print('edge is fully within box.')
-                    verts.extend([edge_start, edge_end])
-                else:
-                    print('edge is not fully within box.')
-
-                    print('edge_start_in: {}'.format(edge_start_in))
-                    print('edge_end_in: {}'.format(edge_end_in))
-
-                    plane_intersects = [
-                        plane.line_segment_intersection(edge_start, edge_end)
-                        for plane in frustum_planes
-                    ]
-                    print('plane_intersects: {}\n'.format(plane_intersects))
-
-            if eg_idx > 0:
-                all_verts.append(np.array([np.nan] * 3))
-
-            all_verts.extend(verts)
-
-        all_verts = np.vstack(all_verts)
-        print('all_verts: \n{}\n'.format(all_verts))
-
-        # planes = ...
-        # For each edge (line segment), find where (or whether) it intersects
-        # with the viewing frustum...
-        #   - for each plane:
-        #       - if it doesn't intersect:
-        #             if both vertices are outside the viewing frustum:
-        #                 discard the edge
-        #             else:
-        #                 keep the whole edge.
-        #       - if it intersects once:
-        #             trim the start or end of the edge
-        #       - else:
-        #             trim both ends of the edge
-
-        # set edge_vertices and edge_vertices_proj
+    def copy(self):
+        return self.__copy__()

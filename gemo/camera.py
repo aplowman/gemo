@@ -100,8 +100,8 @@ class Camera(object):
         # Which line segments are parallel to which planes
         parallel_idx = distances[:, :, 0] == distances[:, :, 1]
 
-        #print('distances: \n{}\n'.format(distances))
-        #print('parallel_idx: \n{}\n'.format(parallel_idx))
+        # print('distances: \n{}\n'.format(distances))
+        # print('parallel_idx: \n{}\n'.format(parallel_idx))
 
         # Find intersection point of (non-parallel) line segments with planes:
         non_para_idx = np.logical_not(parallel_idx)
@@ -120,7 +120,7 @@ class Camera(object):
         line_seg_in_idx = self.test_points_in_view(
             np.hstack(lines)).reshape((n_lines, 2))
 
-        #print('line_seg_in_idx: \n{}\n'.format(line_seg_in_idx))
+        # print('line_seg_in_idx: \n{}\n'.format(line_seg_in_idx))
 
         clipped_lines = []
         line_indices = []
@@ -128,6 +128,8 @@ class Camera(object):
 
             #print('----------------------\nline_idx: {}'.format(line_idx))
             #print('line: \n{}\n'.format(lines[line_idx]))
+
+            #print('line_seg_in_idx[line_idx]: {}'.format(line_seg_in_idx[line_idx]))
 
             # If both segment ends are inside, keep line and continue
             if all(line_seg_in_idx[line_idx]):
@@ -153,46 +155,45 @@ class Camera(object):
                 # Convert intersection parameters into 4D clip space points:
                 start = lines[line_idx][:, 0]
                 end = lines[line_idx][:, 1]
-                #print('start: {}'.format(start))
-                #print('end: {}'.format(end))
+                # print('start: {}'.format(start))
+                # print('end: {}'.format(end))
 
                 int_points = np.array([point_on_line(start, end, i)
                                        for i in uniq_int_param]).T
-                #print('int_points: {}'.format(int_points))
+                # print('int_points: {}'.format(int_points))
 
                 # Continue with only those intersections point that are within the frustum
                 int_points_in_bool = self.test_points_in_view(int_points)
                 int_points_in = int_points[:, int_points_in_bool]
-                #print('int_points_in_bool: {}'.format(int_points_in_bool))
-                #print('int_points_in: {}'.format(int_points_in))
+                # print('int_points_in_bool: {}'.format(int_points_in_bool))
+                # print('int_points_in: {}'.format(int_points_in))
 
                 if int_points_in.size:
 
                     if not any(line_seg_in_idx[line_idx]):
                         # Both segment ends are outside
                         # Clip each end to the intersection points (should be exactly two):
-                        #print('both ends outside')
+                        # print('both ends outside')
                         assert int_points_in.shape[1] == 2
                         new_line = int_points_in
 
                     else:
-                        # One segment is outside
+                        # One segment end is outside
                         # Clip outside point to intersection point (should be exactly one):
-                        #print('one end outside')
+                        # print('one end outside')
                         assert int_points_in.shape[1] == 1
-                        clip_seg_idx = np.where(
-                            ~line_seg_in_idx[line_idx])[0][0]
-                        #print('clip_seg_idx: {}'.format(clip_seg_idx))
+                        clip_seg_idx = np.where(~line_seg_in_idx[line_idx])[0][0]
+                        # print('clip_seg_idx: {}'.format(clip_seg_idx))
                         new_line = np.copy(lines[line_idx])
                         new_line[:, clip_seg_idx] = int_points_in[:, 0]
 
-                    #print('appending new line [CLIPPED]: {}'.format(new_line))
+                    # print('appending new line [CLIPPED]: {}'.format(new_line))
                     clipped_lines.append(new_line)
                     line_indices.append(line_idx)
 
-#         print('clipped_lines: \n')
-#         for i in clipped_lines:
-#            print(i)
+        # print('clipped_lines: \n')
+        # for i in clipped_lines:
+            # print(i)
 
         if clipped_lines:
             clipped_lines = np.array(clipped_lines)

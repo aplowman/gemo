@@ -134,3 +134,40 @@ def get_lines_trace(lines):
         out = np.hstack(np.concatenate([lines, nannys], axis=2))
 
     return out
+
+
+def get_box_edges(corners):
+    'Get line segments representing box edges'
+
+    edges = [
+        corners[:, [0, 1]],
+        corners[:, [1, 4]],
+        corners[:, [4, 2]],
+        corners[:, [2, 0]],
+
+        corners[:, [3, 5]],
+        corners[:, [5, 7]],
+        corners[:, [7, 6]],
+        corners[:, [6, 3]],
+
+        #corners[:, [0, 1]],
+        corners[:, [1, 5]],
+        #corners[:, [5, 3]],
+        corners[:, [3, 0]],
+
+        #corners[:, [2, 4]],
+        corners[:, [4, 7]],
+        #corners[:, [7, 6]],
+        corners[:, [6, 2]],
+
+        #corners[:, [0, 2]],
+        #corners[:, [2, 6]],
+        #corners[:, [6, 3]],
+        #corners[:, [3, 0]],
+
+        #corners[:, [1, 4]],
+        #corners[:, [4, 7]],
+        #corners[:, [7, 5]],
+        #corners[:, [5, 1]],
+    ]
+    return np.array(edges)  # [10:11]
