@@ -13,13 +13,31 @@ from gemo.backends import make_figure_func
 from gemo.utils import nest, validate_3d_vector, get_lines_trace, get_box_edges
 
 
-def get_plot_data(points, boxes, lines, group_points, dimension):
+def get_plot_data(points, boxes, lines, group_points, style_points, dimension):
     'Collate data for plotting.'
+
+    if not style_points:
+        style_points = {}
 
     points_dat = []
     for points_name, points_set in points.items():
 
-        if points_name in group_points:
+        pts_style = style_points.get(points_name, {})
+
+        if points_name not in group_points:
+            pts_dat = {
+                'x': points_set.get_components(0),
+                'y': points_set.get_components(1),
+                'name': points_name,
+                'styles': pts_style,
+            }
+            if dimension == 3:
+                pts_dat.update({
+                    'z': points_set.get_components(2),
+                })
+            points_dat.append(pts_dat)
+
+        elif points_name in group_points:
             # Split points into groups:
 
             group_names = [i['label'] for i in group_points[points_name]]
@@ -38,15 +56,17 @@ def get_plot_data(points, boxes, lines, group_points, dimension):
                 # Maybe a Sites.subset method would be useful here to get a
                 # new Sites object with a subset of coords:
                 pts = points_set.whose(**labels_match)
+                styles = copy.deepcopy(pts_style)
+                styles.update({
+                    style_name: style_vals[i[group_names.index(label_name)]]
+                    for label_name, label_styles in all_styles.items()
+                    for style_name, style_vals in label_styles.items()
+                })
                 pts_dat = {
                     'name': group_name_fmt.format(*i),
                     'x': pts[0],
                     'y': pts[1],
-                    'styles': {
-                        style_name: style_vals[i[group_names.index(label_name)]]
-                        for label_name, label_styles in all_styles.items()
-                        for style_name, style_vals in label_styles.items()
-                    }
+                    'styles': styles,
                 }
                 if dimension == 3:
                     pts_dat.update({'z': pts[2]})
@@ -237,17 +257,20 @@ class GeometryGroup(object):
 
         return group_dict
 
-    def _get_plot_data(self, group_points):
-        return get_plot_data(self.points, self.boxes, self.lines, group_points, dimension=3)
+    def _get_plot_data(self, group_points, style_points):
+        return get_plot_data(self.points, self.boxes, self.lines, group_points,
+                             style_points, dimension=3)
 
     def copy(self):
         return self.__copy__()
 
-    def show(self, group_points=None, layout_args=None, target='interactive',
-             backend='plotly'):
+    def show(self, group_points=None, style_points=None, layout_args=None,
+             target='interactive', backend='plotly'):
+
+        print('GG.show: layout_args: {}'.format(layout_args))
 
         group_points = self.validate_points_grouping(group_points)
-        plot_data = self._get_plot_data(group_points)
+        plot_data = self._get_plot_data(group_points, style_points)
         fig = make_figure_func[backend](plot_data, layout_args, dimension=3)
 
         return fig
@@ -443,6 +466,8 @@ class GeometryGroupProjection(object):
         # Call `show` method on the geometry group with some additional geometries to
         # represent the camera.
 
+        print('GGP.preview: layout_args: {}'.format(layout_args))
+
         geom_group = self.geometry_group.copy()
 
         frustum_edge, frustum_origin = self.camera.get_frustum_world()  # TODO: return Box
@@ -468,9 +493,14 @@ class GeometryGroupProjection(object):
             'Camera (up)': cam_look_up_vec.reshape((1, 3, 2)),
         })
 
-        return geom_group.show(group_points, layout_args, backend)
+        out = geom_group.show(
+            group_points=group_points,
+            layout_args=layout_args,
+            backend=backend,
+        )
+        return out
 
-    def show(self, group_points=None, layout_args=None, backend='plotly'):
+    def show(self, group_points=None, style_points=None, layout_args=None, backend='plotly'):
         'Show 2D projection.'
 
         group_points = self.geometry_group.validate_points_grouping(group_points)
@@ -480,7 +510,8 @@ class GeometryGroupProjection(object):
         # pprint(projected_verts)
 
         plot_data = get_plot_data(projected_verts['points'], projected_verts['boxes'],
-                                  projected_verts['lines'], group_points, dimension=2)
+                                  projected_verts['lines'], group_points, style_points,
+                                  dimension=2)
 
         # print('plot_data')
         # pprint(plot_data)

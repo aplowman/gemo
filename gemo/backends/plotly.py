@@ -16,12 +16,23 @@ PLOTLY_STYLES = {
     'outline_colour': {
         'ensure_exists': {'marker': {'line': {'color': None, 'width': 3}}},
         'set': ['marker', 'line', 'color'],
-    }
+    },
+    'marker_size': {
+        'ensure_exists': {'marker': {'size': None}},
+        'set': ['marker', 'size'],
+    },
+    'marker_symbol': {
+        'ensure_exists': {'marker': {'symbol': None}},
+        'set': ['marker', 'symbol'],
+    },
 }
 
 
 def extract_styles(trace_dict):
     'Extract styles and return in a format suitable for Plotly.'
+
+    if 'styles' not in trace_dict:
+        return {}
 
     styles = trace_dict.pop('styles')
 
