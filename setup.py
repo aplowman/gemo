@@ -49,7 +49,7 @@ setup(
         'ipywidgets>=7.5',  # for plotly in Jupyter NBs/Lab
         'jupyterlab>=1.0',  # for plotly in Jupyter NBs/Lab
         'vecmaths',
-        'spatial_sites',
+        'spatial_sites>=0.2.0',
     ],
     project_urls={
         'Github': 'https://github.com/aplowman/gemo',
