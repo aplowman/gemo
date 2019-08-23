@@ -44,9 +44,10 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
-        'plotly',
-        'notebook>=5.3',    # for plotly in Jupyter NBs
-        'ipywidgets>=7.2',  # for plotly in Jupyter NBs
+        'plotly',           # for backend='plotly'
+        'notebook>=5.3',    # for plotly in Jupyter NBs/Lab
+        'ipywidgets>=7.5',  # for plotly in Jupyter NBs/Lab
+        'jupyterlab>=1.0',  # for plotly in Jupyter NBs/Lab
         'vecmaths',
         'spatial_sites',
     ],
@@ -54,7 +55,7 @@ setup(
         'Github': 'https://github.com/aplowman/gemo',
     },
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python :: 3.5',
