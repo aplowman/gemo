@@ -105,6 +105,117 @@ def get_plot_data(points, boxes, lines, group_points, style_points, dimension):
     return data
 
 
+def get_geometry_extrema(geometries):
+    """Get the minimum and maximum vertices for each geometry.
+
+    Parameters
+    ----------
+    geometries : dict
+        Dict with keys:
+            points : dict, optional
+            boxes : dict, optional
+            lines : dict, optional
+
+    Returns
+    -------
+    extrema : dict
+        Dict with keys:
+            points : dict 
+            boxes : dict
+            lines : dict
+    """
+    out = {}
+
+    if geometries.get('points'):
+        points = {}
+        for name, pts in geometries['points'].items():
+            minmax = np.hstack([
+                np.min(pts._coords, axis=1)[:3, None],
+                np.max(pts._coords, axis=1)[:3, None],
+            ])
+            points.update({name: minmax})
+        out.update({'points': points})
+
+    if geometries.get('boxes'):
+        boxes = {}
+        for name, box in geometries['boxes'].items():
+            if hasattr(box, 'edges'):
+                minmax = np.hstack([
+                    np.min(box.edges, axis=(0, 2))[:, None],
+                    np.max(box.edges, axis=(0, 2))[:, None],
+                ])
+            else:
+                minmax = np.hstack([
+                    np.min(box.vertices, axis=1)[:, None],
+                    np.max(box.vertices, axis=1)[:, None],
+                ])
+            boxes.update({name: minmax})
+        out.update({'boxes': boxes})
+
+    if geometries.get('lines'):
+        lines = {}
+        for name, line in geometries['lines'].items():
+            minmax = np.hstack([
+                np.min(line, axis=(0, 2))[:, None],
+                np.max(line, axis=(0, 2))[:, None],
+            ])
+            lines.update({name: minmax})
+        out.update({'lines': lines})
+
+    return out
+
+
+def get_overall_geometry_extrema(geometries):
+    """Get the overall minimum and maximum vertices over all geometries.
+
+    Parameters
+    ----------
+    geometries : dict
+        Dict with keys:
+            points : dict 
+            boxes : dict
+            lines : dict
+
+    Returns
+    -------
+    extrema : ndarray of shape (3, 2)
+        First column is minimums for each dimension, second column is maximums for each
+        dimension.
+
+    """
+
+    if not geometries:
+        msg = 'No geometries specified.'
+        raise ValueError(msg)
+
+    extrema = np.zeros((3, 2))
+
+    all_minmax = get_geometry_extrema(geometries)
+
+    if 'points' in all_minmax:
+        all_pts_minmax = np.hstack([i for i in all_minmax['points'].values()])
+        all_pts_min = np.min(all_pts_minmax, axis=1)
+        all_pts_max = np.max(all_pts_minmax, axis=1)
+        extrema[:, 0] = np.min(np.vstack([extrema[:, 0], all_pts_min]), axis=0)
+        extrema[:, 1] = np.max(np.vstack([extrema[:, 1], all_pts_max]), axis=0)
+
+    if 'boxes' in all_minmax:
+        all_bx_minmax = np.hstack([i for i in all_minmax['boxes'].values()])
+        all_bx_min = np.min(all_bx_minmax, axis=1)[:3]
+        all_bx_max = np.max(all_bx_minmax, axis=1)[:3]
+        extrema[:, 0] = np.min(np.vstack([extrema[:, 0], all_bx_min]), axis=0)
+        extrema[:, 1] = np.max(np.vstack([extrema[:, 1], all_bx_max]), axis=0)
+
+    if 'lines' in all_minmax:
+        all_ln_minmax = np.hstack([i for i in all_minmax['lines'].values()])
+        all_ln_min = np.min(all_ln_minmax, axis=1)
+        all_ln_max = np.max(all_ln_minmax, axis=1)
+        extrema[:, 0] = np.min(np.vstack([extrema[:, 0], all_ln_min]), axis=0)
+        extrema[:, 1] = np.max(np.vstack([extrema[:, 1], all_ln_max]), axis=0)
+
+    return extrema
+
+
 class GeometryGroup(object):
 
     def __init__(self, points=None, boxes=None, lines=None):
@@ -134,12 +245,6 @@ class GeometryGroup(object):
             )
         )
         return out
-
-    def __copy__(self):
-        points = copy.deepcopy(self.points)
-        boxes = copy.deepcopy(self.boxes)
-        lines = copy.deepcopy(self.lines)
-        return GeometryGroup(points=points, boxes=boxes, lines=lines)
 
     def _validate_points(self, points):
 
@@ -261,13 +366,8 @@ class GeometryGroup(object):
         return get_plot_data(self.points, self.boxes, self.lines, group_points,
                              style_points, dimension=3)
 
-    def copy(self):
-        return self.__copy__()
-
     def show(self, group_points=None, style_points=None, layout_args=None,
              target='interactive', backend='plotly'):
-
-        print('GG.show: layout_args: {}'.format(layout_args))
 
         group_points = self.validate_points_grouping(group_points)
         plot_data = self._get_plot_data(group_points, style_points)
@@ -300,6 +400,22 @@ class GeometryGroup(object):
         'Get all box edges as couples of vertices.'
         return {name: get_box_edges(box.vertices) for name, box in self.boxes.items()}
 
+    @property
+    def bounding_box(self):
+        'Get axis-aligned bounding box.'
+        extrema = get_overall_geometry_extrema({
+            'points': self.points,
+            'boxes': self.boxes,
+            'lines': self.lines,
+        })
+        box = Box.from_extrema(*extrema.T)
+        return box
+
+    @property
+    def centroid(self):
+        'Get the centroid of the axis-aligned bounding box.'
+        return self.bounding_box.centroid
+
 
 class GeometryGroupProjection(object):
 
@@ -314,24 +430,59 @@ class GeometryGroupProjection(object):
     def __init__(self, geometry_group, camera):
         self.geometry_group = geometry_group
         self.camera = camera
-        self.clipped_geometries = self._clip_geometries()
 
-    def _clip_geometries(self):
-        'Clip all geometries to within the view frustum.'
+        # These are computed on first-access of their respective properties:
+        self._vertices_homo = None
+        self._vertices_camera = None
+        self._vertices_clip = None
+        self._clipped_geometries = None
 
-        verts_homo = self._get_homogeneous_verts()
-        verts_cam = self._to_camera_space(verts_homo)
-        verts_clip = self._to_clip_space(verts_cam)
-        clipped_verts_clip = self._clip_vertices(verts_clip)
+    def get_camera_vertices_extrema(self):
+        'Get the minimum and maximum geometry vertices in camera space.'
+        return get_overall_geometry_extrema(self.vertices_camera)
 
-        return clipped_verts_clip
+    def get_vertices_extrema(self):
+        verts_cam = self.get_camera_vertices_extrema()
+        verts_cam_homo = np.vstack([verts_cam, np.zeros((1, 2))])
+        cam_inv = np.linalg.inv(self.camera.camera_transform)
+        verts = cam_inv @ verts_cam_homo
+
+        return verts
+
+    @property
+    def clipped_geometries(self):
+        'Get geometry vertices, in clip space coordinates, clipped to the view frustum.'
+        if not self._clipped_geometries:
+            self._clipped_geometries = self._clip_vertices(self.vertices_clip)
+        return self._clipped_geometries
+
+    @property
+    def vertices_homo(self):
+        'Get geometry vertices, in homogeneous coordinates.'
+        if not self._vertices_homo:
+            self._vertices_homo = self._get_homogeneous_verts()
+        return self._vertices_homo
+
+    @property
+    def vertices_camera(self):
+        'Get geometry vertices, in camera space coordinates.'
+        if not self._vertices_camera:
+            self._vertices_camera = self._to_camera_space(self.vertices_homo)
+        return self._vertices_camera
+
+    @property
+    def vertices_clip(self):
+        'Get geometry vertices, in clip space coordinates.'
+        if not self._vertices_clip:
+            self._vertices_clip = self._to_clip_space(self.vertices_camera)
+        return self._vertices_clip
 
     def _get_homogeneous_verts(self):
         'Copy geometries and add homogeneous coordinates.'
 
         points_h = {}
         for name, pts in self.geometry_group.points.items():
-            pts_new = pts.copy()
+            pts_new = copy.deepcopy(pts)
             points_h.update({name: pts_new.to_homogeneous()})
 
         lines_h = {name: np.concatenate([i, np.ones((i.shape[0], 1, 2))], axis=1)
@@ -339,12 +490,10 @@ class GeometryGroupProjection(object):
 
         boxes_h = {}
         for name, box in self.geometry_group.boxes.items():
-            box_new = box.copy()
+            box_new = copy.deepcopy(box)
             box_new.edges = np.concatenate(
                 [box.edges, np.ones((box.edges.shape[0], 1, 2))], axis=1)
             boxes_h.update({name: box_new})
-
-        # print('boxes_h: {}'.format(boxes_h))
 
         out = {
             'points': points_h,
@@ -435,7 +584,7 @@ class GeometryGroupProjection(object):
 
         cboxes_h_ndc = {}
         for name, box in self.clipped_geometries['boxes'].items():
-            box_new = box.copy()
+            box_new = copy.deepcopy(box)
             box_new.edges = box.edges / box.edges[:, 3][:, None]
             cboxes_h_ndc.update({name: box_new})
 
@@ -466,9 +615,7 @@ class GeometryGroupProjection(object):
         # Call `show` method on the geometry group with some additional geometries to
         # represent the camera.
 
-        print('GGP.preview: layout_args: {}'.format(layout_args))
-
-        geom_group = self.geometry_group.copy()
+        geom_group = copy.deepcopy(self.geometry_group)
 
         frustum_edge, frustum_origin = self.camera.get_frustum_world()  # TODO: return Box
         #print('making frustum box')
@@ -506,15 +653,9 @@ class GeometryGroupProjection(object):
         group_points = self.geometry_group.validate_points_grouping(group_points)
         projected_verts = self._get_projected_verts()
 
-        # print('projected_verts')
-        # pprint(projected_verts)
-
         plot_data = get_plot_data(projected_verts['points'], projected_verts['boxes'],
                                   projected_verts['lines'], group_points, style_points,
                                   dimension=2)
-
-        # print('plot_data')
-        # pprint(plot_data)
 
         # For axes labels:
         u_x = self.camera.camera_transform[0, :3]

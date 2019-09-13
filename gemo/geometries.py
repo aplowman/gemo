@@ -90,6 +90,12 @@ class Box(object):
 
         self.edges = self._get_edges()
 
+    @classmethod
+    def from_extrema(cls, mins, maxes):
+        'Generate from minimum and maximum coordinates in each dimension.'
+        edge_vectors = np.diag(maxes - mins)
+        return cls(edge_vectors, origin=mins)
+
     def __repr__(self):
 
         indent = ' ' * 4
@@ -114,16 +120,6 @@ class Box(object):
             )
         )
         return out
-
-    def __copy__(self):
-        # print('copying')
-        box = Box(
-            edge_vectors=np.copy(self.edge_vectors),
-            edge_labels=copy.copy(self.edge_labels),
-        )
-        # Preserve edges since they may have been modified:
-        box.edges = np.copy(self.edges)
-        return box
 
     def _validate_edge_vectors(self, edge_vectors):
 
@@ -196,5 +192,6 @@ class Box(object):
         #print('self.origin: \n{}\n'.format(self.origin))
         return geometry.get_box_corners(self.edge_vectors, self.origin)[0]
 
-    def copy(self):
-        return self.__copy__()
+    @property
+    def centroid(self):
+        return np.mean(self.vertices, axis=1)

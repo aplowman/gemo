@@ -215,16 +215,68 @@ class OrthographicCamera(Camera):
     """Clipping planes left, right, ... form a box with one corner at (left, bottom,
     -near) and the opposite corner at (right, top, -far)."""
 
-    def __init__(self, look_at, up, left, right, bottom, top, near, far, look_from=None):
+    def __init__(self, look_at, up, width, height, depth, look_from=None):
 
         super().__init__(look_at, up, look_from)
 
-        self.left = left
-        self.right = right
-        self.bottom = bottom
-        self.top = top
-        self.near = near
-        self.far = far
+        self.width = width
+        self.height = height
+        self.depth = -depth
+
+    @classmethod
+    def from_bounding_box(cls, geometry_group, look_at, up, width=None, height=None,
+                          depth=None, camera_translate=None):
+        """Create the camera from the bounding box of a geometry group.
+
+        Parameters
+        ----------
+        geometry_group : GeometryGroup
+            The geometry group whose bounding box is used to generate the camera.
+
+        """
+
+        # First make a camera with unit view frustum, at the geom group centroid:
+        look_from = geometry_group.centroid
+        camera_tmp = cls(look_at, up, width=1, height=1, depth=1, look_from=look_from)
+        proj = geometry_group.project(camera_tmp)
+        cam_inv = np.linalg.inv(proj.camera.camera_transform)
+
+        # Get min/max vertices in camera space:
+        verts = proj.get_camera_vertices_extrema()
+        dims = verts[:, 1] - verts[:, 0]
+
+        if not width:
+            width = dims[0]
+        if not height:
+            height = dims[1]
+        if not depth:
+            depth = dims[2]
+
+        depth_translate = (cam_inv @ np.array([[0, 0, depth / 2, 1]]).T)[:3, 0]
+        depth_translate = depth_translate - look_from
+
+        new_look_from = np.copy(look_from) + depth_translate
+
+        if camera_translate is not None:
+            camera_translate = validate_3d_vector(camera_translate).astype(float)
+            translate = (cam_inv @ np.append(camera_translate, [0])[:, None])[:3, 0]
+            new_look_from += translate
+
+        # print('verts: \n{}'.format(verts))
+        # print('width: {}; height: {}; depth: {}'.format(width, height, depth))
+        # print('depth_translate: \n{}'.format(depth_translate))
+        # print('look_from: \n{}'.format(look_from))
+        # print('new_look_from: \n{}'.format(new_look_from))
+
+        camera = cls(
+            look_at,
+            up,
+            width=width,
+            height=height,
+            depth=depth,
+            look_from=new_look_from
+        )
+        return camera
 
     def get_frustum_camera(self):
         edge_vectors = np.array([
@@ -233,8 +285,8 @@ class OrthographicCamera(Camera):
             [0, 0, self.depth],
         ])
         origin = np.array([
-            self.left - self.width / 2,
-            self.bottom - self.height / 2,
+            self.left,
+            self.bottom,
             self.near,
         ])
         return (edge_vectors, origin)
@@ -268,16 +320,28 @@ class OrthographicCamera(Camera):
         return xyz
 
     @property
-    def width(self):
-        return self.right - self.left
+    def left(self):
+        return - self.width / 2
 
     @property
-    def height(self):
-        return self.top - self.bottom
+    def right(self):
+        return self.width / 2
 
     @property
-    def depth(self):
-        return self.far - self.near
+    def bottom(self):
+        return - self.height / 2
+
+    @property
+    def top(self):
+        return self.height / 2
+
+    @property
+    def near(self):
+        return 0
+
+    @property
+    def far(self):
+        return self.depth
 
     @property
     def projection_transform(self):
@@ -297,8 +361,5 @@ class OrthographicCamera(Camera):
         ])
 
         proj = scaling @ trans
-
-        #print('projection scaling: \n{}\n'.format(scaling))
-        #print('projection trans: \n{}\n'.format(trans))
 
         return proj
