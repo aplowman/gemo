@@ -1,5 +1,8 @@
 '`gemo.camera.py` Virtual camera code including a class for an orthographic camera.'
 
+import copy
+
+from gemo.gemo import get_overall_geometry_extrema
 from gemo.utils import validate_3d_vector, to_4d_array, point_on_line
 
 import numpy as np
@@ -24,17 +27,17 @@ def camera_transform(look_at, up, look_from=None):
 
     """
 
-    #print('look_at: {}'.format(look_at))
-    #print('up: {}'.format(up))
-    #print('look_from: {}'.format(look_from))
+    if look_from is None:
+        look_from = [0, 0, 0]
+
+    look_at = validate_3d_vector(look_at)
+    up = validate_3d_vector(up)
+    look_from = validate_3d_vector(look_from)
 
     # construct an orthonormal basis:
     u_x = np.cross(look_at, up)
     # (`look_at` and `up` may not be perpendicular)
     u_y = np.cross(u_x, look_at)
-
-    #print('u_x: {}'.format(u_x))
-    #print('u_y: {}'.format(u_y))
 
     # Normalise:
     u_x = u_x / np.linalg.norm(u_x)
@@ -235,15 +238,22 @@ class OrthographicCamera(Camera):
 
         """
 
-        # First make a camera with unit view frustum, at the geom group centroid:
-        look_from = geometry_group.centroid
-        camera_tmp = cls(look_at, up, width=1, height=1, depth=1, look_from=look_from)
-        proj = geometry_group.project(camera_tmp)
-        cam_inv = np.linalg.inv(proj.camera.camera_transform)
-
-        # Get min/max vertices in camera space:
-        verts = proj.get_camera_vertices_extrema()
-        dims = verts[:, 1] - verts[:, 0]
+        # Find the correct `look_from` and frustum dimensions. Since the geometry group
+        # centroid is axis aligned, it will change as the geometry group is rotated,
+        # so we need the centroid of the rotation geometry group to be the `look_from`
+        # vector.
+        cam1 = camera_transform(look_at, up)
+        cam1_inv = np.linalg.inv(cam1)
+        geometry_group = copy.deepcopy(geometry_group)
+        geometry_group.transform(cam1[:3, :3])
+        look_from = (cam1_inv @ np.append(geometry_group.centroid, [0])[:, None])[:3, 0]
+        geometries = {
+            'points': geometry_group.points,
+            'boxes': geometry_group.boxes,
+            'lines': geometry_group.lines,
+        }
+        extrema = get_overall_geometry_extrema(geometries)
+        dims = extrema[:, 1] - extrema[:, 0]
 
         if not width:
             width = dims[0]
@@ -252,21 +262,19 @@ class OrthographicCamera(Camera):
         if not depth:
             depth = dims[2]
 
-        depth_translate = (cam_inv @ np.array([[0, 0, depth / 2, 1]]).T)[:3, 0]
-        depth_translate = depth_translate - look_from
+        cam2 = camera_transform(look_at, up, look_from)
+        cam2_inv = np.linalg.inv(cam2)
 
+        # Translate `look_from` away from the centroid, towards the near plane of the
+        # bounding box:
+        depth_translate = (cam2_inv @ np.array([[0, 0, depth / 2, 1]]).T)[:3, 0]
+        depth_translate = depth_translate - look_from
         new_look_from = np.copy(look_from) + depth_translate
 
         if camera_translate is not None:
             camera_translate = validate_3d_vector(camera_translate).astype(float)
-            translate = (cam_inv @ np.append(camera_translate, [0])[:, None])[:3, 0]
+            translate = (cam2_inv @ np.append(camera_translate, [0])[:, None])[:3, 0]
             new_look_from += translate
-
-        # print('verts: \n{}'.format(verts))
-        # print('width: {}; height: {}; depth: {}'.format(width, height, depth))
-        # print('depth_translate: \n{}'.format(depth_translate))
-        # print('look_from: \n{}'.format(look_from))
-        # print('new_look_from: \n{}'.format(new_look_from))
 
         camera = cls(
             look_at,
@@ -274,8 +282,9 @@ class OrthographicCamera(Camera):
             width=width,
             height=height,
             depth=depth,
-            look_from=new_look_from
+            look_from=new_look_from,
         )
+
         return camera
 
     def get_frustum_camera(self):
@@ -294,8 +303,6 @@ class OrthographicCamera(Camera):
     def get_frustum_camera_xyz(self):
 
         edge, origin = self.get_frustum_camera()
-        #print('edge: {}'.format(edge))
-        #print('origin: {}'.format(origin))
         xyz = geometry.get_box_xyz(edge.astype(float), origin.astype(float))[0]
         return xyz
 

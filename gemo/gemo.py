@@ -13,14 +13,20 @@ from gemo.backends import make_figure_func
 from gemo.utils import nest, validate_3d_vector, get_lines_trace, get_box_edges
 
 
-def get_plot_data(points, boxes, lines, group_points, style_points, dimension):
+def get_plot_data(points, boxes, lines, group_points, style_points, include, dimension):
     'Collate data for plotting.'
 
     if not style_points:
         style_points = {}
 
+    if not include:
+        include = {}
+
     points_dat = []
     for points_name, points_set in points.items():
+
+        if 'points' in include and points_name not in include['points']:
+            continue
 
         pts_style = style_points.get(points_name, {})
 
@@ -74,6 +80,8 @@ def get_plot_data(points, boxes, lines, group_points, style_points, dimension):
 
     boxes_dat = []
     for box_name, box in boxes.items():
+        if 'boxes' in include and box_name not in include['boxes']:
+            continue
         edges_trace = get_lines_trace(box.edges)
         box_dat = {
             'name': box_name,
@@ -86,6 +94,8 @@ def get_plot_data(points, boxes, lines, group_points, style_points, dimension):
 
     lines_dat = []
     for ln_name, ln in lines.items():
+        if 'lines' in include and ln_name not in include['lines']:
+            continue
         ln_trace = get_lines_trace(ln)
         ln_dat = {
             'name': ln_name,
@@ -214,6 +224,31 @@ def get_overall_geometry_extrema(geometries):
         extrema[:, 1] = np.max(np.vstack([extrema[:, 1], all_ln_max]), axis=0)
 
     return extrema
+
+
+def transform_geometries(geometries, transformation):
+    'Apply a transformation matrix to each geometry.'
+
+    out = {
+        'points': {},
+        'lines': {},
+        'boxes': {},
+    }
+    if geometries.get('points'):
+        out['points'].update({name: transformation @ i
+                              for name, i in geometries['points'].items()})
+
+    if geometries.get('lines'):
+        out['lines'].update({name: transformation @ i
+                             for name, i in geometries['lines'].items()})
+
+    if geometries.get('boxes'):
+        for name, box in geometries['boxes'].items():
+            box_new = copy.deepcopy(box)
+            box_new.edges = transformation @ box.edges
+            out['boxes'].update({name: box_new})
+
+    return out
 
 
 class GeometryGroup(object):
@@ -362,21 +397,32 @@ class GeometryGroup(object):
 
         return group_dict
 
-    def _get_plot_data(self, group_points, style_points):
+    def _get_plot_data(self, group_points, style_points, include):
         return get_plot_data(self.points, self.boxes, self.lines, group_points,
-                             style_points, dimension=3)
+                             style_points, include, dimension=3)
 
-    def show(self, group_points=None, style_points=None, layout_args=None,
+    def show(self, group_points=None, style_points=None, include=None, layout_args=None,
              target='interactive', backend='plotly'):
 
         group_points = self.validate_points_grouping(group_points)
-        plot_data = self._get_plot_data(group_points, style_points)
+        plot_data = self._get_plot_data(group_points, style_points, include)
         fig = make_figure_func[backend](plot_data, layout_args, dimension=3)
 
         return fig
 
     def project(self, camera):
         return GeometryGroupProjection(self, camera)
+
+    def transform(self, transformation):
+        geometries = {
+            'points': self.points,
+            'boxes': self.boxes,
+            'lines': self.lines,
+        }
+        transformed = transform_geometries(geometries, transformation)
+        self.points = transformed.get('points', {})
+        self.boxes = transformed.get('boxes', {})
+        self.lines = transformed.get('lines', {})
 
     @property
     def bounding_coordinates(self):
@@ -506,20 +552,14 @@ class GeometryGroupProjection(object):
     def _to_camera_space(self, verts_world):
         'Transform vertices from world space to camera space.'
 
-        cam_trans = self.camera.camera_transform
-        points_h_cam = {name: cam_trans @ i for name, i in verts_world['points'].items()}
-        lines_h_cam = {name: cam_trans @ i for name, i in verts_world['lines'].items()}
-
-        boxes_h_cam = {}
-        for name, box in verts_world['boxes'].items():
-            box.edges = cam_trans @ box.edges
-            boxes_h_cam.update({name: box})
-
-        out = {
-            'points': points_h_cam,
-            'lines': lines_h_cam,
-            'boxes': boxes_h_cam,
-        }
+        out = transform_geometries(
+            {
+                'points': verts_world['points'],
+                'lines': verts_world['lines'],
+                'boxes': verts_world['boxes'],
+            },
+            self.camera.camera_transform
+        )
 
         return out
 
@@ -609,7 +649,8 @@ class GeometryGroupProjection(object):
 
         return out
 
-    def preview(self, group_points=None, layout_args=None, backend='plotly'):
+    def preview(self, group_points=None, style_points=None, include=None,
+                layout_args=None, backend='plotly'):
         'Show 3D figure with clipped geometries and view frustum.'
 
         # Call `show` method on the geometry group with some additional geometries to
@@ -642,12 +683,15 @@ class GeometryGroupProjection(object):
 
         out = geom_group.show(
             group_points=group_points,
+            style_points=style_points,
+            include=include,
             layout_args=layout_args,
             backend=backend,
         )
         return out
 
-    def show(self, group_points=None, style_points=None, layout_args=None, backend='plotly'):
+    def show(self, group_points=None, style_points=None, include=None, layout_args=None,
+             backend='plotly'):
         'Show 2D projection.'
 
         group_points = self.geometry_group.validate_points_grouping(group_points)
@@ -655,7 +699,7 @@ class GeometryGroupProjection(object):
 
         plot_data = get_plot_data(projected_verts['points'], projected_verts['boxes'],
                                   projected_verts['lines'], group_points, style_points,
-                                  dimension=2)
+                                  include, dimension=2)
 
         # For axes labels:
         u_x = self.camera.camera_transform[0, :3]
