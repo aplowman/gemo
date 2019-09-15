@@ -1,11 +1,11 @@
 [![PyPI version](https://badge.fury.io/py/gemo.svg)](https://badge.fury.io/py/gemo)
 
-# [WIP] geomo
+# [WIP] gemo
 Visualise sets of geometric objects in Python.
 
 ## Installation
 
-`pip install geomo`
+`pip install gemo`
 
 ## Notes
 
