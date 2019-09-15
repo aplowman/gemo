@@ -1,4 +1,4 @@
-[![PyPI version](https://badge.fury.io/py/geomo.svg)](https://badge.fury.io/py/geomo)
+[![PyPI version](https://badge.fury.io/py/gemo.svg)](https://badge.fury.io/py/gemo)
 
 # [WIP] geomo
 Visualise sets of geometric objects in Python.
