@@ -29,21 +29,17 @@ def get_plot_data(points, boxes, lines, group_points, style_points, include, dim
             continue
 
         pts_style = style_points.get(points_name, {})
+        for k, v in pts_style.items():
+            if isinstance(v, str):
+                if '<<projection_depth>>' in v:
+                    pts_style[k] = points_set._coords[2]
+                elif '<<projection_depth_max>>' in v:
+                    pts_style[k] = np.max(points_set._coords[2])
+                elif '<<projection_depth_min>>' in v:
+                    pts_style[k] = np.min(points_set._coords[2])
 
-        if points_name not in group_points:
-            pts_dat = {
-                'x': points_set.get_components(0),
-                'y': points_set.get_components(1),
-                'name': points_name,
-                'styles': pts_style,
-            }
-            if dimension == 3:
-                pts_dat.update({
-                    'z': points_set.get_components(2),
-                })
-            points_dat.append(pts_dat)
-
-        elif points_name in group_points:
+        sub_points_dat = []
+        if points_name in group_points:
             # Split points into groups:
 
             group_names = [i['label'] for i in group_points[points_name]]
@@ -76,7 +72,21 @@ def get_plot_data(points, boxes, lines, group_points, style_points, include, dim
                 }
                 if dimension == 3:
                     pts_dat.update({'z': pts[2]})
-                points_dat.append(pts_dat)
+                sub_points_dat.append(pts_dat)
+
+        else:
+            pts_dat = {
+                'x': points_set.get_components(0),
+                'y': points_set.get_components(1),
+                'name': points_name,
+            }
+            if dimension == 3:
+                pts_dat.update({
+                    'z': points_set.get_components(2),
+                })
+            sub_points_dat.append(pts_dat)
+
+        points_dat.extend(sub_points_dat)
 
     boxes_dat = []
     for box_name, box in boxes.items():
@@ -630,8 +640,13 @@ class GeometryGroupProjection(object):
 
         # Translate and scale back to world coordinates # TODO change this to a matrix:
         # TODO: perhaps this can be 3x3 matrix (not if it translates...)?
+        # TODO: sort out depth
+        mat = np.linalg.inv(self.camera.camera_transform)
+        mat = mat @ np.linalg.inv(self.camera.projection_transform)
+
         trans = np.array([[1, 1, 0, 0]]).T
-        scale = np.array([[self.camera.width/2, self.camera.height/2, 1, 1]]).T
+        scale = np.array(
+            [[self.camera.width/2, self.camera.height/2, 1, 1]]).T
 
         cpoints_h_world = {name: (i + trans) * scale for name, i in cpoints_h_ndc.items()}
         clines_h_world = {name: (i + trans) * scale for name, i in clines_h_ndc.items()}
@@ -696,6 +711,9 @@ class GeometryGroupProjection(object):
 
         group_points = self.geometry_group.validate_points_grouping(group_points)
         projected_verts = self._get_projected_verts()
+
+        minn = np.min(projected_verts['points']['atoms']._coords, axis=1)
+        maxx = np.max(projected_verts['points']['atoms']._coords, axis=1)
 
         plot_data = get_plot_data(projected_verts['points'], projected_verts['boxes'],
                                   projected_verts['lines'], group_points, style_points,

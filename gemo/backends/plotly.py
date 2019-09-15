@@ -13,9 +13,25 @@ PLOTLY_STYLES = {
         'ensure_exists': {'marker': {'color': None}},
         'set': ['marker', 'color'],
     },
+    'fill_colour_max': {
+        'ensure_exists': {'marker': {'cmax': None}},
+        'set': ['marker', 'cmax'],
+    },
+    'fill_colour_min': {
+        'ensure_exists': {'marker': {'cmin': None}},
+        'set': ['marker', 'cmin'],
+    },
+    'fill_colourscale': {
+        'ensure_exists': {'marker': {'colorscale': None}},
+        'set': ['marker', 'colorscale'],
+    },
     'outline_colour': {
-        'ensure_exists': {'marker': {'line': {'color': None, 'width': 3}}},
+        'ensure_exists': {'marker': {'line': {'color': None}}},
         'set': ['marker', 'line', 'color'],
+    },
+    'outline_size': {
+        'ensure_exists': {'marker': {'line': {'width': None}}},
+        'set': ['marker', 'line', 'width'],
     },
     'marker_size': {
         'ensure_exists': {'marker': {'size': None}},
@@ -85,6 +101,8 @@ def make_figure(data, layout_args, dimension):
     plotly_args = {
         'xaxis': layout_args.get('xaxis', {}),
         'yaxis': layout_args.get('yaxis', {}),
+        'width': layout_args.get('width', None),
+        'height': layout_args.get('height', None),
     }
 
     if dimension == 2:
