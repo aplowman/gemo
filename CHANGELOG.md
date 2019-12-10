@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.2] - 2019.12.10
+
+### Added
+
+- Add points styles for points not in a group.
+
 ## [0.1.1] - 2019.09.15
 
 ### Added
