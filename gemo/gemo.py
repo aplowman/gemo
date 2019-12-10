@@ -79,6 +79,7 @@ def get_plot_data(points, boxes, lines, group_points, style_points, include, dim
                 'x': points_set.get_components(0),
                 'y': points_set.get_components(1),
                 'name': points_name,
+                'styles': pts_style,
             }
             if dimension == 3:
                 pts_dat.update({
